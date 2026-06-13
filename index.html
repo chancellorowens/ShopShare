@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Shopping Checklist</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --text-muted: #6c757d;
+            --primary-color: #4dadf7;
+            --primary-hover: #339af0;
+            --border-color: #dee2e6;
+            --danger-color: #ff6b6b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 80px; /* Space for sticky bottom input */
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 4px 0;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .sync-status {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-muted);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.syncing { background-color: #fcc419; }
+        .status-dot.success { background-color: #51cf66; }
+        .status-dot.error { background-color: var(--danger-color); }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1rem;
+            resize: none;
+            margin-bottom: 12px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        textarea:focus {
+            border-color: var(--primary-color);
+        }
+
+        button {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active {
+            background-color: var(--primary-hover);
+        }
+
+        .list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 14px 16px;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .list-item.checked {
+            background-color: #f1f3f5;
+            border-color: #e9ecef;
+            opacity: 0.7;
+        }
+
+        .list-item.checked .item-text {
+            color: var(--text-muted);
+            text-decoration: line-through;
+        }
+
+        /* Custom optimized checkbox for mobile tapping */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 14px;
+            cursor: pointer;
+        }
+
+        .custom-checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+            background: white;
+        }
+
+        .list-item.checked .custom-checkbox {
+            background-color: #51cf66;
+            border-color: #51cf66;
+        }
+
+        .custom-checkbox::after {
+            content: "✓";
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .list-item.checked .custom-checkbox::after {
+            display: block;
+        }
+
+        .item-text {
+            font-size: 1.05rem;
+            flex-grow: 1;
+            word-break: break-word;
+        }
+
+        .clear-actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .btn-clear {
+            background: transparent;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            width: auto;
+        }
+        
+        .btn-clear:active {
+            background: #fff5f5;
+        }
+
+        /* Floating interaction layer for adding a single quick item */
+        .quick-add-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-bg);
+            padding: 12px 16px;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 8px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .quick-add-bar input {
+            flex-grow: 1;
+            padding: 12px;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .quick-add-bar button {
+            width: auto;
+            padding: 12px 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Shopping List</h1>
+        <div class="sync-status">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </header>
+
+    <div class="card">
+        <textarea id="bulk-input" placeholder="Paste your list here...&#10;Each line break will become a separate item."></textarea>
+        <button id="btn-import" onclick="importBulkList()">Add List Items</button>
+    </div>
+
+    <div id="list-container" class="list-container">
+        </div>
+
+    <div class="clear-actions">
+        <button class="btn-clear" onclick="clearCheckedItems()">Remove Checked Items</button>
+    </div>
+
+    <div class="quick-add-bar">
+        <input type="text" id="quick-input" placeholder="Quick add item..." onkeypress="handleQuickAddKeyPress(event)">
+        <button onclick="addQuickItem()">Add</button>
+    </div>
+
+    <script>
+        // ============================================================================
+        // CONFIGURATION: ADD YOUR JSONBIN INFORMATION HERE
+        // ============================================================================
+        const JSONBIN_BIN_ID = '6a2d9243da38895dfebaeec2'; // Replace with your actual Bin ID (e.g., '64b1f...')
+        const JSONBIN_API_KEY = '$2a$10$RYrhMNpvUEH4e.DZmKk.xuRUjetJ9Dh7JUgSsvp6gO2NtRA9yNKeO'; // Replace with your X-Access-Key
+        // ============================================================================
+
+        const API_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+        
+        // Local state
+        let items = [];
+        let isPolling = false;
+
+        // Elements
+        const listContainer = document.getElementById('list-container');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        // Status Handler
+        function updateStatus(type, text) {
+            statusDot.className = 'status-dot ' + type;
+            statusText.innerText = text;
+        }
+
+        // Fetch data from Jsonbin
+        async function fetchList() {
+            if (JSONBIN_BIN_ID.includes('YOUR_BIN_ID')) {
+                updateStatus('error', 'API Config Missing');
+                loadLocalBackup();
+                return;
+            }
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'X-Access-Key': JSONBIN_API_KEY
+                    }
+                });
+
+                if (!response.ok) throw new Error('Network error');
+                
+                const data = await response.json();
+                // Jsonbin stores data inside record object
+                if (data.record && Array.isArray(data.record.items)) {
+                    items = data.record.items;
+                    renderList();
+                    updateStatus('success', 'Synced');
+                    saveLocalBackup();
+                }
+            } catch (error) {
+                console.error("Fetch failed:", error);
+                updateStatus('error', 'Offline / Sync Error');
+            }
+        }
+
+        // Push data to Jsonbin
+        async function saveList() {
+            renderList(); // Render immediately for local responsiveness (Optimistic UI)
+            saveLocalBackup();
+
+            if (JSONBIN_BIN_ID.includes('YOUR_BIN_ID')) {
+                updateStatus('error', 'API Config Missing');
+                return;
+            }
+
+            updateStatus('syncing', 'Saving...');
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Access-Key': JSONBIN_API_KEY
+                    },
+                    body: JSON.stringify({ items: items })
+                });
+
+                if (!response.ok) throw new Error('Save failed');
+                updateStatus('success', 'Synced');
+            } catch (error) {
+                console.error("Save failed:", error);
+                updateStatus('error', 'Save Failed');
+            }
+        }
+
+        // Local storage backups to prevent data loss or provide offline usage
+        function saveLocalBackup() {
+            localStorage.setItem('shopping_list_backup', JSON.stringify(items));
+        }
+
+        function loadLocalBackup() {
+            const backup = localStorage.getItem('shopping_list_backup');
+            if (backup) {
+                items = JSON.parse(backup);
+                renderList();
+            }
+        }
+
+        // Render function handling Sorting (Unchecked on top, Checked pushed to bottom)
+        function renderList() {
+            listContainer.innerHTML = '';
+
+            // Sort logic: false (0) comes before true (1). Unchecked items stay on top.
+            const sortedItems = [...items].sort((a, b) => a.checked - b.checked);
+
+            if (sortedItems.length === 0) {
+                listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 20px;">List is empty</p>';
+                return;
+            }
+
+            sortedItems.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = `list-item ${item.checked ? 'checked' : ''}`;
+                
+                // Clicking anywhere on the card row toggles the item for optimal mobile tapping target area
+                itemEl.onclick = () => toggleItem(item.id);
+
+                itemEl.innerHTML = `
+                    <div class="checkbox-container">
+                        <div class="custom-checkbox"></div>
+                    </div>
+                    <div class="item-text">${escapeHTML(item.text)}</div>
+                `;
+                listContainer.appendChild(itemEl);
+            });
+        }
+
+        // Toggle checked state
+        function toggleItem(id) {
+            items = items.map(item => {
+                if (item.id === id) {
+                    return { ...item, checked: !item.checked };
+                }
+                return item;
+            });
+            saveList();
+        }
+
+        // Add Bulk List from Textarea
+        function importBulkList() {
+            const textarea = document.getElementById('bulk-input');
+            const lines = textarea.value.split('\n');
+            let addedCount = 0;
+
+            lines.forEach(line => {
+                const cleanedText = line.trim();
+                if (cleanedText.length > 0) {
+                    items.push({
+                        id: Date.now() + Math.random().toString(36).substr(2, 5),
+                        text: cleanedText,
+                        checked: false
+                    });
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                textarea.value = '';
+                saveList();
+            }
+        }
+
+        // Add a Single Quick Item
+        function addQuickItem() {
+            const input = document.getElementById('quick-input');
+            const cleanedText = input.value.trim();
+            if (cleanedText.length > 0) {
+                items.push({
+                    id: Date.now() + Math.random().toString(36).substr(2, 5),
+                    text: cleanedText,
+                    checked: false
+                });
+                input.value = '';
+                saveList();
+            }
+        }
+
+        function handleQuickAddKeyPress(event) {
+            if (event.key === 'Enter') {
+                addQuickItem();
+            }
+        }
+
+        // Clear Checked Items
+        function clearCheckedItems() {
+            if (confirm('Are you sure you want to delete all checked items?')) {
+                items = items.filter(item => !item.checked);
+                saveList();
+            }
+        }
+
+        // Helper to prevent XSS injection
+        function escapeHTML(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Initialization & Auto-polling setup for multiple users
+        window.onload = () => {
+            loadLocalBackup(); // instantly display cached info if available
+            fetchList();
+            
+            // Poll for updates every 7 seconds to catch modifications made by other users
+            setInterval(() => {
+                fetchList();
+            }, 7000);
+        };
+    </script>
+</body>
+</html>
