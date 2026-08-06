@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Class Schedule</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;        /* Dark slate background */
+            --card-bg: #1e293b;         /* Dark card container */
+            --accent-color: #38bdf8;     /* Bright neon blue */
+            --progress-color: #8BB8E8;   /* Solid blue fill */
+            --text-color: #f8fafc;       /* Bright light text */
+            --border-color: #334155;     /* Subtle border */
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevents whole page scroll */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: flex-end; /* Aligns the container to the right */
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .container {
+            width: 320px; /* Default skinny width */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-color);
+            border-left: 1px dashed var(--border-color);
+            padding: 8px;
+        }
+
+        /* Toggle Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 6px;
+            flex-shrink: 0;
+        }
+
+        .toggle-btn {
+            background-color: transparent;
+            color: #94a3b8;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .toggle-btn:hover {
+            color: var(--text-color);
+            border-color: var(--accent-color);
+        }
+
+        /* Data Storage Controls */
+        .io-controls {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+
+        .io-btn {
+            flex: 1;
+            background-color: #334155;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.2s;
+        }
+
+        .io-btn:hover {
+            background-color: #475569;
+        }
+
+        /* Tabs Styling */
+        .tabs-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+            scrollbar-width: thin;
+        }
+
+        .tab-btn {
+            background-color: #334155;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: grab;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .tab-btn.dragging-tab {
+            opacity: 0.4;
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-color);
+            color: #0f172a;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        .add-tab-btn {
+            background-color: #334155;
+            color: var(--text-color);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .tab-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+
+        .tab-title-input {
+            width: 100%;
+            font-size: 0.95rem;
+            font-weight: bold;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 8px;
+            color: var(--text-color);
+        }
+
+        .duplicate-btn {
+            background-color: var(--accent-color);
+            color: #0f172a;
+            border: none;
+            padding: 5px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+        }
+
+        .delete-btn {
+            background-color: #ff2a6d;
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            box-shadow: 0 0 8px rgba(255, 42, 109, 0.3);
+        }
+
+        /* Schedule Vertical Cards */
+        .schedule-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--card-gap, 6px);
+            flex-grow: 1; /* Takes all available vertical height */
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .class-card {
+            position: relative;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: var(--card-padding, 6px 8px);
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.15s ease, opacity 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex-grow: 1; /* Stretches class cards evenly to fill vertical space */
+            min-height: 0;
+        }
+
+        .class-card.dragging {
+            opacity: 0.4;
+            border: 2px dashed var(--accent-color);
+        }
+
+        /* Solid Fill Overlay */
+        .progress-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background-color: var(--progress-color);
+            opacity: 1;
+            pointer-events: none;
+            transition: height 1s linear;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            color: #64748b;
+            font-size: var(--icon-size, 0.9rem);
+            user-select: none;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .card-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: var(--content-gap, 4px);
+            width: 100%;
+            margin: 0;
+        }
+
+        /* Class Name Box */
+        .class-input {
+            flex-grow: 1;
+            font-size: var(--input-font-size, 0.85rem);
+            font-weight: bold;
+            color: #0f172a;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: var(--input-padding, 2px 4px);
+            outline: none;
+            min-width: 0;
+        }
+
+        .class-input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 4px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Inline Remove Button */
+        .remove-card-btn {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: var(--remove-font-size, 0.75rem);
+            padding: 0 4px;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .remove-card-btn:hover {
+            color: #ff2a6d;
+        }
+
+        /* Single Horizontal Line for Times */
+        .time-inputs {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+            font-size: var(--time-font-size, 0.72rem);
+            color: #94a3b8;
+            flex-wrap: nowrap;
+            width: 100%;
+        }
+
+        .time-group {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+        }
+
+        .time-inputs input[type="time"] {
+            background-color: #0f172a;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: var(--time-padding, 1px 3px);
+            font-size: var(--time-font-size, 0.72rem);
+            font-family: inherit;
+            color-scheme: dark;
+        }
+
+        .add-class-btn {
+            margin-top: 8px;
+            width: 100%;
+            padding: 8px;
+            background-color: #1e293b;
+            border: 2px dashed var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            transition: background 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .add-class-btn:hover {
+            background-color: #334155;
+            border-color: var(--accent-color);
+        }
+
+        /* Utility class to hide UI controls */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-bar">
+        <button class="toggle-btn" id="toggleControlsBtn">v</button>
+    </div>
+
+    <div class="collapsible-controls" id="collapsibleControls">
+        <div class="io-controls">
+            <button class="io-btn" id="exportBtn">⬇ Export Data</button>
+            <button class="io-btn" id="importBtn">⬆ Import Data</button>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+        </div>
+
+        <div class="tabs-header" id="tabsHeader"></div>
+        
+        <div class="tab-controls">
+            <input type="text" id="tabNameInput" class="tab-title-input" placeholder="Schedule Name">
+            <button class="duplicate-btn" id="duplicateTabBtn">Duplicate</button>
+            <button class="delete-btn" id="deleteTabBtn">Delete</button>
+        </div>
+    </div>
+
+    <div class="schedule-list" id="scheduleList"></div>
+
+    <button class="add-class-btn collapsible-controls" id="addClassBtn">+ Add Class</button>
+</div>
+
+<script>
+    const STORAGE_KEY = 'class_schedules_data';
+    
+    let appData = {
+        activeTabId: null,
+        schedules: []
+    };
+
+    let draggedItemIndex = null;
+    let draggedTabIndex = null;
+
+    function loadData() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                appData = JSON.parse(saved);
+            } catch (e) {
+                console.error("Failed to parse cached data:", e);
+                initDefaultData();
+            }
+        } else {
+            initDefaultData();
+        }
+    }
+
+    function initDefaultData() {
+        const defaultId = 'sched_' + Date.now();
+        appData = {
+            activeTabId: defaultId,
+            schedules: [{
+                id: defaultId,
+                title: 'Main Schedule',
+                blocks: [
+                    { name: 'Period 1: Math', start: '08:00', end: '09:00' },
+                    { name: 'Period 2: Science', start: '09:05', end: '10:05' }
+                ]
+            }]
+        };
+        saveData();
+    }
+
+    function saveData() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+    }
+
+    function getActiveSchedule() {
+        return appData.schedules.find(s => s.id === appData.activeTabId);
+    }
+
+    function renderTabs() {
+        const tabsHeader = document.getElementById('tabsHeader');
+        tabsHeader.innerHTML = '';
+
+        appData.schedules.forEach((schedule, index) => {
+            const btn = document.createElement('button');
+            btn.className = `tab-btn ${schedule.id === appData.activeTabId ? 'active' : ''}`;
+            btn.textContent = schedule.title || 'Untitled';
+            btn.draggable = true;
+            btn.dataset.tabIndex = index;
+
+            btn.onclick = () => {
+                appData.activeTabId = schedule.id;
+                saveData();
+                render();
+            };
+
+            // Drag and Drop events for reordering tabs
+            btn.addEventListener('dragstart', (e) => {
+                draggedTabIndex = index;
+                btn.classList.add('dragging-tab');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            btn.addEventListener('dragend', () => {
+                btn.classList.remove('dragging-tab');
+                draggedTabIndex = null;
+            });
+
+            btn.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            btn.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (draggedTabIndex === null || draggedTabIndex === index) return;
+
+                const movedTab = appData.schedules.splice(draggedTabIndex, 1)[0];
+                appData.schedules.splice(index, 0, movedTab);
+
+                saveData();
+                renderTabs();
+            });
+
+            tabsHeader.appendChild(btn);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-tab-btn';
+        addBtn.textContent = '+';
+        addBtn.title = 'Add New Schedule';
+        addBtn.onclick = createNewTab;
+        tabsHeader.appendChild(addBtn);
+    }
+
+    function createNewTab() {
+        const newId = 'sched_' + Date.now();
+        const newSchedule = {
+            id: newId,
+            title: 'New Schedule',
+            blocks: []
+        };
+        appData.schedules.push(newSchedule);
+        appData.activeTabId = newId;
+        saveData();
+        render();
+    }
+
+    function duplicateActiveTab() {
+        const activeSchedule = getActiveSchedule();
+        if (!activeSchedule) return;
+
+        const newId = 'sched_' + Date.now();
+        const duplicatedSchedule = {
+            id: newId,
+            title: `${activeSchedule.title} (Copy)`,
+            blocks: JSON.parse(JSON.stringify(activeSchedule.blocks))
+        };
+
+        appData.schedules.push(duplicatedSchedule);
+        appData.activeTabId = newId;
+        saveData();
+        render();
+    }
+
+    function adjustScaling(count) {
+        const root = document.documentElement;
+        if (count > 7) {
+            root.style.setProperty('--card-gap', '3px');
+            root.style.setProperty('--card-padding', '3px 6px');
+            root.style.setProperty('--content-gap', '2px');
+            root.style.setProperty('--input-font-size', '0.78rem');
+            root.style.setProperty('--input-padding', '1px 3px');
+            root.style.setProperty('--time-font-size', '0.65rem');
+            root.style.setProperty('--time-padding', '1px 2px');
+            root.style.setProperty('--remove-font-size', '0.65rem');
+            root.style.setProperty('--icon-size', '0.8rem');
+        } else if (count > 4) {
+            root.style.setProperty('--card-gap', '5px');
+            root.style.setProperty('--card-padding', '5px 8px');
+            root.style.setProperty('--content-gap', '3px');
+            root.style.setProperty('--input-font-size', '0.82rem');
+            root.style.setProperty('--input-padding', '2px 4px');
+            root.style.setProperty('--time-font-size', '0.7rem');
+            root.style.setProperty('--time-padding', '1px 3px');
+            root.style.setProperty('--remove-font-size', '0.7rem');
+            root.style.setProperty('--icon-size', '0.9rem');
+        } else {
+            root.style.setProperty('--card-gap', '6px');
+            root.style.setProperty('--card-padding', '6px 8px');
+            root.style.setProperty('--content-gap', '4px');
+            root.style.setProperty('--input-font-size', '0.85rem');
+            root.style.setProperty('--input-padding', '2px 4px');
+            root.style.setProperty('--time-font-size', '0.72rem');
+            root.style.setProperty('--time-padding', '2px 3px');
+            root.style.setProperty('--remove-font-size', '0.72rem');
+            root.style.setProperty('--icon-size', '0.95rem');
+        }
+    }
+
+    function renderBlocks() {
+        const scheduleList = document.getElementById('scheduleList');
+        const activeSchedule = getActiveSchedule();
+        const tabNameInput = document.getElementById('tabNameInput');
+
+        if (!activeSchedule) {
+            scheduleList.innerHTML = '';
+            tabNameInput.value = '';
+            return;
+        }
+
+        tabNameInput.value = activeSchedule.title;
+        scheduleList.innerHTML = '';
+
+        adjustScaling(activeSchedule.blocks.length);
+
+        activeSchedule.blocks.forEach((block, index) => {
+            const card = document.createElement('div');
+            card.className = 'class-card';
+            card.draggable = true;
+            card.dataset.index = index;
+
+            card.innerHTML = `
+                <div class="progress-fill" id="progress-${index}"></div>
+                <div class="card-content">
+                    <div class="card-header">
+                        <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+                        <input type="text" class="class-input" value="${block.name}" placeholder="Class Name" data-field="name">
+                        <button class="remove-card-btn" onclick="removeBlock(${index})">✕</button>
+                    </div>
+                    <div class="time-inputs">
+                        <div class="time-group">
+                            <span>From:</span>
+                            <input type="time" value="${block.start}" data-field="start">
+                        </div>
+                        <div class="time-group">
+                            <span>To:</span>
+                            <input type="time" value="${block.end}" data-field="end">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            card.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const field = e.target.dataset.field;
+                    activeSchedule.blocks[index][field] = e.target.value;
+                    saveData();
+                    updateProgress();
+                });
+            });
+
+            card.addEventListener('dragstart', (e) => {
+                draggedItemIndex = index;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                draggedItemIndex = null;
+            });
+
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (draggedItemIndex === null || draggedItemIndex === index) return;
+
+                const movedItem = activeSchedule.blocks.splice(draggedItemIndex, 1)[0];
+                activeSchedule.blocks.splice(index, 0, movedItem);
+
+                saveData();
+                renderBlocks();
+            });
+
+            scheduleList.appendChild(card);
+        });
+
+        updateProgress();
+    }
+
+    function addBlock() {
+        const activeSchedule = getActiveSchedule();
+        if (!activeSchedule) return;
+
+        let newStart = '09:00';
+        let newEnd = '10:00';
+
+        if (activeSchedule.blocks.length > 0) {
+            const lastBlock = activeSchedule.blocks[activeSchedule.blocks.length - 1];
+            if (lastBlock.end) {
+                const [lastH, lastM] = lastBlock.end.split(':').map(Number);
+                let startMinutes = lastH * 60 + lastM + 5;
+                let endMinutes = startMinutes + 60;
+
+                const formatTime = (totalMins) => {
+                    const h = Math.floor((totalMins / 60) % 24).toString().padStart(2, '0');
+                    const m = (totalMins % 60).toString().padStart(2, '0');
+                    return `${h}:${m}`;
+                };
+
+                newStart = formatTime(startMinutes);
+                newEnd = formatTime(endMinutes);
+            }
+        }
+
+        activeSchedule.blocks.push({
+            name: '',
+            start: newStart,
+            end: newEnd
+        });
+
+        saveData();
+        renderBlocks();
+    }
+
+    window.removeBlock = function(index) {
+        const activeSchedule = getActiveSchedule();
+        if (!activeSchedule) return;
+
+        activeSchedule.blocks.splice(index, 1);
+        saveData();
+        renderBlocks();
+    };
+
+    function updateProgress() {
+        const activeSchedule = getActiveSchedule();
+        if (!activeSchedule) return;
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        activeSchedule.blocks.forEach((block, index) => {
+            const fillElem = document.getElementById(`progress-${index}`);
+            if (!fillElem) return;
+
+            if (!block.start || !block.end) {
+                fillElem.style.height = '0%';
+                return;
+            }
+
+            const [startH, startM] = block.start.split(':').map(Number);
+            const [endH, endM] = block.end.split(':').map(Number);
+
+            const startTotal = startH * 60 + startM;
+            const endTotal = endH * 60 + endM;
+
+            if (endTotal <= startTotal) {
+                fillElem.style.height = '0%';
+                return;
+            }
+
+            if (currentMinutes < startTotal) {
+                fillElem.style.height = '0%';
+            } else if (currentMinutes >= endTotal) {
+                fillElem.style.height = '100%';
+            } else {
+                const duration = endTotal - startTotal;
+                const elapsed = currentMinutes - startTotal;
+                const percentage = Math.min(100, Math.max(0, (elapsed / duration) * 100));
+                fillElem.style.height = `${percentage}%`;
+            }
+        });
+    }
+
+    /* Data Export & Import Handlers */
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `class_schedules_backup_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (importedData && Array.isArray(importedData.schedules)) {
+                    appData = importedData;
+                    saveData();
+                    render();
+                    alert("Data imported successfully!");
+                } else {
+                    alert("Invalid data structure in JSON file.");
+                }
+            } catch (err) {
+                alert("Failed to parse JSON file.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    /* Toggle Controls Logic */
+    document.getElementById('toggleControlsBtn').addEventListener('click', () => {
+        const controls = document.querySelectorAll('.collapsible-controls');
+        controls.forEach(ctrl => ctrl.classList.toggle('hidden'));
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', exportData);
+    document.getElementById('importBtn').addEventListener('click', () => {
+        document.getElementById('importFileInput').click();
+    });
+    document.getElementById('importFileInput').addEventListener('change', importData);
+
+    document.getElementById('tabNameInput').addEventListener('input', (e) => {
+        const activeSchedule = getActiveSchedule();
+        if (activeSchedule) {
+            activeSchedule.title = e.target.value;
+            saveData();
+            renderTabs();
+        }
+    });
+
+    document.getElementById('deleteTabBtn').addEventListener('click', () => {
+        if (appData.schedules.length <= 1) {
+            alert("You must keep at least one schedule tab.");
+            return;
+        }
+
+        appData.schedules = appData.schedules.filter(s => s.id !== appData.activeTabId);
+        appData.activeTabId = appData.schedules[0].id;
+        saveData();
+        render();
+    });
+
+    document.getElementById('duplicateTabBtn').addEventListener('click', duplicateActiveTab);
+    document.getElementById('addClassBtn').addEventListener('click', addBlock);
+
+    function render() {
+        renderTabs();
+        renderBlocks();
+    }
+
+    // App Initialization
+    loadData();
+    render();
+
+    setInterval(updateProgress, 30000);
+</script>
+
+</body>
+</html>
